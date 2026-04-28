@@ -44,24 +44,17 @@
     const Sparkles = ({size=24, className="", strokeWidth=2}) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M3 5h4"/><path d="M19 17v4"/><path d="M17 19h4"/></svg>);
     const X = ({size=24, className="", strokeWidth=2}) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>);
     const Loader2 = ({size=24, className="", strokeWidth=2}) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>);
+    const ChevronRight = ({size=24, className="", strokeWidth=2}) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>);
+    const MessageCircle = ({size=24, className="", strokeWidth=2}) => (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>);
 
     // --- Gemini API Setup ---
-    const apiKey = "";
+    const apiKey = ""; // 請在正式上線前填入您的 Gemini API Key
 
-    const generateLocationStory = async (locationTitle) => {
-      const prompt = `你是一位為日系生活風格雜誌撰稿的旅遊編輯。請為即將前往越南胡志明市「${locationTitle}」的旅客，寫一段約 80 字的優雅景點介紹，以及一個簡單實用的在地小提醒。
-      回覆格式請嚴格遵守：
-      【景點印象】
-      (你的介紹文字)
-
-      【編輯私提醒】
-      (你的提醒文字)
-
-      風格要求：安靜、溫柔、帶有哲學感與生活美學。繁體中文。`;
-
+    // 共用的 API 呼叫函式 (加入指數退避重試機制)
+    const callGeminiApi = async (prompt, systemInstructionText) => {
       const payload = {
         contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: "你是一個具有日系質感的旅遊雜誌編輯。" }] }
+        systemInstruction: { parts: [{ text: systemInstructionText }] }
       };
 
       const delay = (ms) => new Promise(res => setTimeout(res, ms));
@@ -76,12 +69,23 @@
           });
           if (!response.ok) throw new Error('API Error');
           const data = await response.json();
-          return data.candidates?.[0]?.content?.parts?.[0]?.text || "無法獲取導覽資訊。";
+          return data.candidates?.[0]?.content?.parts?.[0]?.text;
         } catch (error) {
-          if (i === retries.length - 1) return "目前無法聯繫 AI 導遊，請稍後再試。";
+          if (i === retries.length - 1) return null;
           await delay(retries[i]);
         }
       }
+    };
+
+    // 原有的景點導覽生成
+    const generateLocationStory = async (locationTitle) => {
+      const prompt = `你是一位為日系生活風格雜誌撰稿的旅遊編輯。請為即將前往越南胡志明市「${locationTitle}」的旅客，寫一段約 80 字的優雅景點介紹，以及一個簡單實用的在地小提醒。
+      回覆格式請嚴格遵守：
+      【景點印象】\n(文字)\n\n【編輯私提醒】\n(文字)
+      風格要求：安靜、溫柔、帶有哲學感與生活美學。繁體中文。`;
+      
+      const result = await callGeminiApi(prompt, "你是一個具有日系質感的旅遊雜誌編輯。");
+      return result || "無法獲取導覽資訊。";
     };
 
     // --- Data ---
@@ -108,7 +112,37 @@
         date: "2026.05.01",
         events: [
           { time: "07:15", title: "Aurora Serviced Apartments", duration: "-", desc: "早晨準備" },
-          { time: "08:59", title: "Thới Sơn Eco Land", duration: "5時00分", desc: "湄公河生態體驗" },
+          { 
+            time: "07:30", 
+            title: "🚣 湄公河三角洲一日遊", 
+            duration: "10時00分", 
+            desc: "水鄉、果園與民俗風情 (Full Day Excursion To Mekong Delta)",
+            externalLink: "https://www.klook.com/zh-TW/activity/2016-full-day-excursion-mekong-delta-ho-chi-minh-city/?utm_campaign=platform-share&utm_medium=link-copy&utm_source=link-copy&utm_content=platform%3Ddesktop_pagespm%3DActivity_shareid%3Dd8945c9e-6cbc-4b88-9ac9-8e0613bd14cc",
+            details: {
+              intro: "這趟旅程將帶領大家離開繁忙的胡志明市，深入越南南部的「魚米之鄉」。我們將穿梭於蜿蜒的運河、探索百年古寺，並在果園中體驗最道地的水鄉生活。",
+              schedule: [
+                { time: "07:30", text: "集合出發：從胡志明市區搭乘舒適巴士前往美萩市" },
+                { time: "08:00", text: "導覽開始：抵達美萩市 (Mỹ Tho)，開始水鄉探索之旅" },
+                { time: "上午", text: "百年古剎巡禮：永長寺 (Vinh Trang Pagoda) - 融合中、法、越建築風格" },
+                { time: "上午", text: "泰山島體驗：漫步鄉間小路、享用熱帶水果與蜂蜜茶、聆聽傳統民俗音樂" },
+                { time: "中午", text: "道地午餐：於當地餐廳享用湄公河特色料理 (如象魚等)" },
+                { time: "下午", text: "新石運河探險：搭乘傳統手搖舢舨船遊河，參觀椰子糖家庭作坊" },
+                { time: "15:00", text: "準備回程：搭乘巴士離開湄公河地區" },
+                { time: "17:30", text: "抵達飯店：返回胡志明市，結束精彩的水鄉一日遊" }
+              ],
+              highlights: [
+                "【文化與建築】：參觀著名的永長寺，感受宏偉的臥佛像與精緻的瓷磚拼貼藝術。",
+                "【水鄉交通體驗】：換乘不同交通工具，從大巴士到大木船，最後體驗最具特色的手搖舢舨船穿梭在棕櫚林河道。",
+                "【在地生活感】：在果園中喝茶、聽曲，親手觸摸椰子糖的溫熱與甜味，深度連結越南生活節奏。"
+              ],
+              notes: [
+                "穿著建議：有較多步行與上下船動作，務必穿著防滑好走的布鞋或運動涼鞋。",
+                "防曬防蚊：雖然船上有遮棚，但果園陽光較強，請做好防曬與攜帶防蚊液。",
+                "小費提醒：體驗民俗音樂或搭乘舢舨船時，可準備約 20,000 VND 零錢給表演者或船伕作為小費。",
+                "個人清潔：行程包含熱帶水果體驗，建議隨身攜帶濕紙巾方便餐後清潔。"
+              ]
+            }
+          },
           { time: "18:00", title: "Hum Signature", duration: "2時00分", desc: "Plant-based fine dining 蔬食精緻料理" },
           { time: "20:12", title: "CULCAT 42 Tôn Thất Thiệp", duration: "1時00分", desc: "質感選物與咖啡" },
           { time: "21:20", title: "西貢中心購物商場", duration: "1時00分", desc: "Saigon Centre 逛街" },
@@ -155,6 +189,15 @@
       const [isLoadingAi, setIsLoadingAi] = useState(false);
       const [activeTab, setActiveTab] = useState('cover');
 
+      // AI QA 顧問狀態
+      const [qaInput, setQaInput] = useState("");
+      const [qaResponse, setQaResponse] = useState("");
+      const [isQaLoading, setIsQaLoading] = useState(false);
+
+      // AI 穿搭建議狀態
+      const [outfitSuggestion, setOutfitSuggestion] = useState("");
+      const [isOutfitLoading, setIsOutfitLoading] = useState(false);
+
       const openAiGuide = async (title) => {
         setActiveLocation(title);
         setAiModalOpen(true);
@@ -163,6 +206,29 @@
         const result = await generateLocationStory(title);
         setAiContent(result);
         setIsLoadingAi(false);
+      };
+
+      // 觸發 AI 問答顧問
+      const handleAskAdvisor = async () => {
+        if (!qaInput.trim()) return;
+        setIsQaLoading(true);
+        setQaResponse("");
+
+        const prompt = `您是一位精通越南胡志明市旅遊的日系質感導遊。請用溫柔、專業、帶有生活美學的語氣（繁體中文）回答旅客的提問。盡量保持簡潔扼要（約100字內）。旅客的問題是：「${qaInput}」`;
+        const result = await callGeminiApi(prompt, "你是一個具有日系質感的旅遊顧問。");
+        
+        setQaResponse(result || "抱歉，目前網路訊號微弱，顧問無法及時回覆您的提問，請稍後再試。");
+        setIsQaLoading(false);
+      };
+
+      // 觸發 AI 穿搭建議
+      const handleGenerateOutfit = async () => {
+        setIsOutfitLoading(true);
+        const prompt = "你是日系風格的旅遊雜誌編輯。請根據越南胡志明市 5 月份「悶熱且午後易有雷陣雨」的氣候，推薦一套具有日系文青感、舒適防曬且方便活動的旅行穿搭建議（包含衣著、鞋履、配件）。字數控制在100字以內。繁體中文。";
+        const result = await callGeminiApi(prompt, "你是一個具有品味的日系時尚編輯。");
+        
+        setOutfitSuggestion(result || "目前無法獲取穿搭建議，請以透氣舒適為主。");
+        setIsOutfitLoading(false);
       };
 
       const getMapLink = (query) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -261,13 +327,36 @@
                       </div>
 
                       <div>
-                        <h3 className="font-serif-tc text-lg text-[#4A4A4A] border-b border-[#E5E0D8] pb-3 mb-6 flex items-center gap-2">
-                          <Sun size={18} strokeWidth={1.5} /> 氣候與穿著提醒
-                        </h3>
+                        <div className="flex items-center justify-between border-b border-[#E5E0D8] pb-3 mb-6">
+                           <h3 className="font-serif-tc text-lg text-[#4A4A4A] flex items-center gap-2">
+                             <Sun size={18} strokeWidth={1.5} /> 氣候與穿著提醒
+                           </h3>
+                           {/* Gemini Feature: AI Outfit Suggester */}
+                           <button 
+                             onClick={handleGenerateOutfit} 
+                             disabled={isOutfitLoading || !!outfitSuggestion}
+                             className={`text-[11px] flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                               outfitSuggestion ? 'text-[#8C8C8C] bg-[#F9F8F6] cursor-default' : 'text-[#8A252C] bg-[#8A252C]/5 hover:bg-[#8A252C]/15'
+                             }`}
+                           >
+                             <Sparkles size={12} />
+                             {isOutfitLoading ? '構思中...' : (outfitSuggestion ? '已為您推薦' : '✨ AI 智能穿搭建議')}
+                           </button>
+                        </div>
+                        
+                        {outfitSuggestion && (
+                          <div className="mb-6 bg-[#F9F8F6] p-4 border-l-2 border-[#8A252C] text-sm leading-loose tracking-wide text-[#555] font-serif-tc fade-in">
+                            <div className="flex items-center gap-2 text-[#8A252C] mb-2 font-medium">
+                              <Sparkles size={14}/> 專屬編輯推薦
+                            </div>
+                            {outfitSuggestion}
+                          </div>
+                        )}
+
                         <div className="space-y-4 text-sm leading-loose tracking-wide text-[#666]">
                           <p><span className="font-medium text-[#4A4A4A]">天氣：</span>5 月悶熱，白天紫外線強，以短袖透氣棉質為主。</p>
                           <p><span className="font-medium text-[#4A4A4A]">陣雨：</span>午後常有雷陣雨，建議隨身攜帶雨具或穿防水鞋。</p>
-                          <p className="bg-[#F9F8F6] p-4 border-l-2 border-[#8A252C]"><span className="font-medium text-[#4A4A4A]">寺廟規定：</span>需穿著遮住膝蓋的長褲。如衣服不夠，可在檳城市場或購物中心購買。</p>
+                          <p className="bg-[#F9F8F6] p-4 border border-[#E5E0D8]"><span className="font-medium text-[#4A4A4A]">寺廟規定：</span>需穿著遮住膝蓋的長褲。如衣服不夠，可在檳城市場或購物中心購買。</p>
                         </div>
                       </div>
                     </div>
@@ -333,6 +422,57 @@
                       </div>
                     </div>
                   </div>
+
+                  {/* --- Gemini Feature: AI Travel Advisor QA --- */}
+                  <div className="mt-24 pt-16 border-t border-[#E5E0D8]">
+                    <div className="mb-8">
+                      <h3 className="font-serif-tc text-2xl text-[#333] mb-3 flex items-center gap-2">
+                        <Sparkles className="text-[#8A252C]" size={22} /> AI 專屬旅遊顧問
+                      </h3>
+                      <p className="text-sm tracking-[0.15em] text-[#8C8C8C]">對越南旅行有任何疑問嗎？隨時向您的智能管家發問。</p>
+                    </div>
+
+                    <div className="bg-[#F9F8F6] p-6 md:p-8 border border-[#E5E0D8] rounded shadow-sm">
+                      <div className="flex flex-col md:flex-row gap-4 mb-6">
+                        <div className="flex-1 relative">
+                          <MessageCircle size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8C8C8C]" />
+                          <input 
+                            type="text" 
+                            value={qaInput}
+                            onChange={(e) => setQaInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAskAdvisor()}
+                            placeholder="例如：胡志明市有什麼推薦的伴手禮？"
+                            className="w-full pl-12 pr-4 py-3.5 bg-white border border-[#D9D4CD] text-[15px] focus:outline-none focus:border-[#8A252C] transition-colors rounded text-[#4A4A4A] placeholder-[#D9D4CD]"
+                          />
+                        </div>
+                        <button 
+                          onClick={handleAskAdvisor}
+                          disabled={isQaLoading || !qaInput.trim()}
+                          className="bg-[#8A252C] text-[#F9F8F6] px-8 py-3.5 text-[15px] tracking-widest hover:bg-[#6A1A20] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap rounded shadow-sm flex items-center justify-center gap-2"
+                        >
+                          {isQaLoading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                          {isQaLoading ? '思考中...' : '✨ 送出提問'}
+                        </button>
+                      </div>
+
+                      {(qaResponse || isQaLoading) && (
+                        <div className="bg-white p-6 border border-[#E5E0D8] relative rounded fade-in">
+                          {isQaLoading ? (
+                             <div className="flex items-center gap-3 text-[#8A252C] opacity-80 py-2">
+                               <Loader2 size={16} className="animate-spin" />
+                               <span className="font-serif-tc text-[15px] tracking-widest">顧問正在為您翻閱資料...</span>
+                             </div>
+                          ) : (
+                             <div className="font-serif-tc text-[15px] leading-loose tracking-wider text-[#555] whitespace-pre-wrap">
+                               {qaResponse}
+                             </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* --- End AI Advisor --- */}
+
                 </div>
               </section>
             )}
@@ -365,23 +505,27 @@
                               <div className="flex-1">
                                 <div className="flex items-center flex-wrap gap-4 mb-2">
                                   <a 
-                                    href={getMapLink(`${event.title} ${event.title.includes('機場') ? '' : '胡志明市'}`)} 
+                                    href={event.externalLink ? event.externalLink : getMapLink(`${event.title} ${event.title.includes('機場') ? '' : '胡志明市'}`)} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="text-[16px] font-medium tracking-wide text-[#333] hover:text-[#8A252C] transition-colors flex items-center gap-1.5 group/map"
-                                    title="在 Google Maps 中開啟"
+                                    title={event.externalLink ? "在 Klook 中開啟" : "在 Google Maps 中開啟"}
                                   >
                                     {event.title}
-                                    <MapPin size={13} className="text-[#8C8C8C] group-hover/map:text-[#8A252C] opacity-50 group-hover/map:opacity-100 transition-all" />
+                                    {event.externalLink ? (
+                                      <ChevronRight size={14} className="text-[#8C8C8C] group-hover/map:text-[#8A252C] opacity-50 group-hover/map:opacity-100 transition-all" />
+                                    ) : (
+                                      <MapPin size={13} className="text-[#8C8C8C] group-hover/map:text-[#8A252C] opacity-50 group-hover/map:opacity-100 transition-all" />
+                                    )}
                                   </a>
 
-                                  {event.title !== "Aurora Serviced Apartments" && event.title !== "新山一國際機場" && (
+                                  {event.title !== "Aurora Serviced Apartments" && event.title !== "新山一國際機場" && !event.details && (
                                     <button 
                                       onClick={() => openAiGuide(event.title)}
                                       className="flex items-center gap-1 text-[10px] tracking-widest text-[#8A252C] bg-[#8A252C]/5 px-2 py-1 rounded hover:bg-[#8A252C]/15 transition-colors"
                                     >
                                       <Sparkles size={12} strokeWidth={2} />
-                                      <span>AI 導覽</span>
+                                      <span>✨ AI 導覽</span>
                                     </button>
                                   )}
                                 </div>
@@ -396,6 +540,44 @@
                                     </React.Fragment>
                                   )}
                                 </div>
+
+                                {/* --- 特殊行程詳細區塊 (湄公河專用) --- */}
+                                {event.details && (
+                                  <div className="mt-5 bg-white/70 border border-[#E5E0D8] p-5 md:p-6 rounded-sm text-[13px] leading-relaxed text-[#555] space-y-6 shadow-sm">
+                                    
+                                    <p className="text-sm font-serif-tc text-[#4A4A4A]">{event.details.intro}</p>
+
+                                    {event.externalLink && (
+                                       <a href={event.externalLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-1.5 text-[#F9F8F6] bg-[#8A252C] hover:bg-[#6A1A20] font-serif-tc font-medium tracking-wider px-5 py-2.5 rounded shadow-sm transition-colors w-full sm:w-auto">
+                                          前往 Klook 查看詳細行程與預訂 <ChevronRight size={16} />
+                                       </a>
+                                    )}
+
+                                    <div>
+                                      <h5 className="font-serif-tc text-[#8A252C] font-medium mb-3 flex items-center gap-1.5 text-sm"><Clock size={15} /> 行程時間表</h5>
+                                      <ul className="space-y-2.5 bg-[#F9F8F6] p-4 rounded-sm border border-[#E5E0D8]/60">
+                                        {event.details.schedule.map((s, i) => (
+                                          <li key={i} className="flex flex-col sm:flex-row sm:gap-4 border-b border-[#E5E0D8]/60 pb-2 last:border-0 last:pb-0">
+                                            <span className="text-[#8A252C] font-serif-tc font-medium w-12 shrink-0 mb-1 sm:mb-0">{s.time}</span>
+                                            <span className="text-[#4A4A4A]">{s.text}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                    <div>
+                                      <h5 className="font-serif-tc text-[#8A252C] font-medium mb-3 flex items-center gap-1.5 text-sm"><Sparkles size={15} /> 行程三大亮點</h5>
+                                      <ul className="space-y-2 list-disc list-outside ml-4 text-[#4A4A4A]">
+                                        {event.details.highlights.map((h, i) => <li key={i} className="pl-1">{h}</li>)}
+                                      </ul>
+                                    </div>
+                                    <div>
+                                      <h5 className="font-serif-tc text-[#8A252C] font-medium mb-3 flex items-center gap-1.5 text-sm"><Briefcase size={15} /> 旅程筆記</h5>
+                                      <ul className="space-y-2 list-disc list-outside ml-4 text-[#4A4A4A]">
+                                        {event.details.notes.map((n, i) => <li key={i} className="pl-1">{n}</li>)}
+                                      </ul>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
